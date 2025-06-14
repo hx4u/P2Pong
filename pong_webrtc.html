@@ -25,14 +25,13 @@ const canvas = document.getElementById("pong");
 const ctx = canvas.getContext("2d");
 
 let playerY = 150, opponentY = 150;
-let ball = { x: 300, y: 200, vx: 0, vy: 0, size: 12 };
+let ball = { x: 300, y: 200, vx: 3, vy: 2, size: 12 };
 let up = false, down = false;
 let isMultiplayer = false, isHost = false;
 let conn = null;
-let gameStarted = false;
 let score = { player: 0, opponent: 0 };
 const winScore = 10;
-const ballSpeed = { vx: 2, vy: 1.5 }; // constant speed
+const paddleSpeed = 5;
 
 document.addEventListener("keydown", e => {
   if (e.key === "ArrowUp") up = true;
@@ -46,35 +45,37 @@ document.addEventListener("keyup", e => {
 function draw() {
   ctx.clearRect(0, 0, 600, 400);
   ctx.fillStyle = "#00FF00";
-
   ctx.font = "20px monospace";
   ctx.fillText(`Player: ${score.player}`, 100, 30);
   ctx.fillText(`Opponent: ${score.opponent}`, 380, 30);
-
   ctx.fillRect(10, playerY, 10, 80);
   ctx.fillRect(580, opponentY, 10, 80);
   ctx.fillRect(ball.x, ball.y, ball.size, ball.size);
 }
 
 function updateAI() {
-  let target = ball.y - 40;
-  opponentY += (target - opponentY) * 0.03;
+  const center = opponentY + 40;
+  if (ball.y < center - 10) opponentY -= paddleSpeed * 0.6;
+  else if (ball.y > center + 10) opponentY += paddleSpeed * 0.6;
 }
 
 function updateBall() {
   ball.x += ball.vx;
   ball.y += ball.vy;
 
-  if (ball.y < 0 || ball.y + ball.size > 400) ball.vy *= -1;
+  if (ball.y <= 0 || ball.y + ball.size >= 400) {
+    ball.vy = -ball.vy;
+    ball.y = Math.max(0, Math.min(400 - ball.size, ball.y));
+  }
 
-  if (ball.x < 20 && ball.y + ball.size > playerY && ball.y < playerY + 80) {
-    ball.vx *= -1;
+  if (ball.x <= 20 && ball.y + ball.size > playerY && ball.y < playerY + 80) {
+    ball.vx = Math.abs(ball.vx);
     ball.x = 20;
   }
 
-  if (ball.x + ball.size > 580 && ball.y + ball.size > opponentY && ball.y < opponentY + 80) {
-    ball.vx *= -1;
-    ball.x = 568;
+  if (ball.x + ball.size >= 580 && ball.y + ball.size > opponentY && ball.y < opponentY + 80) {
+    ball.vx = -Math.abs(ball.vx);
+    ball.x = 580 - ball.size;
   }
 
   if (ball.x < 0) {
@@ -86,17 +87,17 @@ function updateBall() {
   }
 
   if (score.player >= winScore || score.opponent >= winScore) {
-    ball.vx = ball.vy = 0;
+    ball.vx = 0;
+    ball.vy = 0;
     ctx.fillStyle = "#00FF00";
     ctx.font = "30px monospace";
     ctx.fillText(score.player >= winScore ? "YOU WIN!" : "YOU LOSE!", 220, 200);
-    return;
   }
 }
 
 function updatePlayer() {
-  if (up && playerY > 0) playerY -= 5;
-  if (down && playerY < 320) playerY += 5;
+  if (up && playerY > 0) playerY -= paddleSpeed;
+  if (down && playerY < 320) playerY += paddleSpeed;
 }
 
 function gameLoop() {
@@ -115,16 +116,16 @@ function gameLoop() {
 function startBall() {
   const directionX = Math.random() > 0.5 ? 1 : -1;
   const directionY = Math.random() > 0.5 ? 1 : -1;
-  ball.vx = ballSpeed.vx * directionX;
-  ball.vy = ballSpeed.vy * directionY;
-  gameStarted = true;
+  ball.vx = 3 * directionX;
+  ball.vy = 2 * directionY;
 }
 
 function resetBall() {
-  ball = { x: 300, y: 200, vx: 0, vy: 0, size: 12 };
-  setTimeout(() => {
-    startBall();
-  }, 1000);
+  ball.x = 300;
+  ball.y = 200;
+  ball.vx = 0;
+  ball.vy = 0;
+  setTimeout(startBall, 1000);
 }
 
 function startSinglePlayer() {
