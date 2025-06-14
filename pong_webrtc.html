@@ -1,14 +1,16 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>WebRTC Pong</title>
+  <title>P2Paddle</title>
   <style>
     canvas { background: #000; display: block; margin: auto; }
     textarea, button { display: block; margin: 10px auto; width: 90%; }
+    body { color: green; font-family: monospace; text-align: center; background: #111; }
   </style>
 </head>
 <body>
 
+<h2>P2Paddle - WebRTC Pong</h2>
 <canvas id="pong" width="600" height="400"></canvas>
 
 <button onclick="startSinglePlayer()">Single Player (vs AI)</button>
@@ -23,14 +25,18 @@ const canvas = document.getElementById("pong");
 const ctx = canvas.getContext("2d");
 
 let playerY = 150, opponentY = 150;
-let ball = { x: 300, y: 200, vx: 4, vy: 2 };
+let ball = { x: 300, y: 200, vx: 0, vy: 0, size: 12 };
 let up = false, down = false;
 let isMultiplayer = false, isHost = false;
 let conn = null;
+let gameStarted = false;
+let score = { player: 0, opponent: 0 };
+const winScore = 10;
 
 document.addEventListener("keydown", e => {
   if (e.key === "ArrowUp") up = true;
   if (e.key === "ArrowDown") down = true;
+  if (e.key === " " && !gameStarted) startBall();
 });
 document.addEventListener("keyup", e => {
   if (e.key === "ArrowUp") up = false;
@@ -39,12 +45,19 @@ document.addEventListener("keyup", e => {
 
 function draw() {
   ctx.clearRect(0, 0, 600, 400);
-  ctx.fillStyle = "white";
+  ctx.fillStyle = "green";
+
+  // Scores
+  ctx.font = "20px monospace";
+  ctx.fillText(`Player: ${score.player}`, 100, 30);
+  ctx.fillText(`Opponent: ${score.opponent}`, 380, 30);
+
+  // Paddles
   ctx.fillRect(10, playerY, 10, 80);
   ctx.fillRect(580, opponentY, 10, 80);
-  ctx.beginPath();
-  ctx.arc(ball.x, ball.y, 8, 0, Math.PI * 2);
-  ctx.fill();
+
+  // Ball (square)
+  ctx.fillRect(ball.x, ball.y, ball.size, ball.size);
 }
 
 function updateAI() {
@@ -56,13 +69,35 @@ function updateBall() {
   ball.x += ball.vx;
   ball.y += ball.vy;
 
-  if (ball.y < 0 || ball.y > 400) ball.vy *= -1;
+  if (ball.y < 0 || ball.y + ball.size > 400) ball.vy *= -1;
 
-  if (ball.x < 20 && ball.y > playerY && ball.y < playerY + 80) ball.vx *= -1;
-  if (ball.x > 570 && ball.y > opponentY && ball.y < opponentY + 80) ball.vx *= -1;
+  // Left paddle
+  if (ball.x < 20 && ball.y + ball.size > playerY && ball.y < playerY + 80) {
+    ball.vx *= -1;
+    ball.x = 20; // avoid stuck
+  }
 
-  if (ball.x < 0 || ball.x > 600) {
-    ball.x = 300; ball.y = 200; ball.vx *= -1;
+  // Right paddle
+  if (ball.x + ball.size > 580 && ball.y + ball.size > opponentY && ball.y < opponentY + 80) {
+    ball.vx *= -1;
+    ball.x = 568; // avoid stuck
+  }
+
+  // Score update
+  if (ball.x < 0) {
+    score.opponent++;
+    resetBall();
+  } else if (ball.x > 600) {
+    score.player++;
+    resetBall();
+  }
+
+  if (score.player >= winScore || score.opponent >= winScore) {
+    ball.vx = ball.vy = 0;
+    ctx.fillStyle = "green";
+    ctx.font = "30px monospace";
+    ctx.fillText(score.player >= winScore ? "YOU WIN!" : "YOU LOSE!", 220, 200);
+    return;
   }
 }
 
@@ -72,21 +107,42 @@ function updatePlayer() {
 }
 
 function gameLoop() {
+  if (!gameStarted) {
+    ctx.clearRect(0, 0, 600, 400);
+    ctx.fillStyle = "green";
+    ctx.font = "20px monospace";
+    ctx.fillText("Press SPACE to start", 200, 200);
+    draw();
+    requestAnimationFrame(gameLoop);
+    return;
+  }
+
   updatePlayer();
   if (!isMultiplayer) updateAI();
   updateBall();
   draw();
 
   if (isMultiplayer && conn?.readyState === "open") {
-    if (isHost) conn.send(JSON.stringify({ ball, playerY }));
+    if (isHost) conn.send(JSON.stringify({ ball, playerY, score }));
   }
 
   requestAnimationFrame(gameLoop);
 }
 
+function startBall() {
+  ball = { x: 300, y: 200, vx: 4 * (Math.random() > 0.5 ? 1 : -1), vy: 2 * (Math.random() > 0.5 ? 1 : -1), size: 12 };
+  gameStarted = true;
+}
+
+function resetBall() {
+  gameStarted = false;
+  ball = { x: 300, y: 200, vx: 0, vy: 0, size: 12 };
+}
+
 function startSinglePlayer() {
   isMultiplayer = false;
-  ball = { x: 300, y: 200, vx: 4, vy: 2 };
+  score = { player: 0, opponent: 0 };
+  resetBall();
   requestAnimationFrame(gameLoop);
 }
 
@@ -99,23 +155,19 @@ function setupConnection() {
       document.getElementById("localSDP").value = JSON.stringify(pc.localDescription);
     }
   };
-  pc.ondatachannel = e => {
-    conn = e.channel;
-    conn.onmessage = e => {
-      const data = JSON.parse(e.data);
-      ball = data.ball;
-      opponentY = data.playerY;
-    };
-  };
 }
 
 function startMultiplayerHost() {
   isMultiplayer = true;
   isHost = true;
+  score = { player: 0, opponent: 0 };
   setupConnection();
   dataChannel = pc.createDataChannel("pong");
   conn = dataChannel;
-  conn.onopen = () => requestAnimationFrame(gameLoop);
+  conn.onopen = () => {
+    resetBall();
+    requestAnimationFrame(gameLoop);
+  };
   conn.onmessage = e => {
     const data = JSON.parse(e.data);
     opponentY = data.playerY;
@@ -126,6 +178,7 @@ function startMultiplayerHost() {
 function startMultiplayerJoin() {
   isMultiplayer = true;
   isHost = false;
+  score = { player: 0, opponent: 0 };
   setupConnection();
   pc.ondatachannel = e => {
     conn = e.channel;
@@ -133,8 +186,12 @@ function startMultiplayerJoin() {
       const data = JSON.parse(e.data);
       ball = data.ball;
       opponentY = data.playerY;
+      score = data.score;
     };
-    conn.onopen = () => requestAnimationFrame(gameLoop);
+    conn.onopen = () => {
+      resetBall();
+      requestAnimationFrame(gameLoop);
+    };
   };
 }
 
