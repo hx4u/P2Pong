@@ -5,7 +5,7 @@
   <style>
     canvas { background: #000; display: block; margin: auto; }
     textarea, button { display: block; margin: 10px auto; width: 90%; }
-    body { color: green; font-family: monospace; text-align: center; background: #111; }
+    body { color: #00FF00; font-family: monospace; text-align: center; background: #111; }
   </style>
 </head>
 <body>
@@ -45,7 +45,7 @@ document.addEventListener("keyup", e => {
 
 function draw() {
   ctx.clearRect(0, 0, 600, 400);
-  ctx.fillStyle = "green";
+  ctx.fillStyle = "#00FF00";
 
   // Scores
   ctx.font = "20px monospace";
@@ -71,19 +71,16 @@ function updateBall() {
 
   if (ball.y < 0 || ball.y + ball.size > 400) ball.vy *= -1;
 
-  // Left paddle
   if (ball.x < 20 && ball.y + ball.size > playerY && ball.y < playerY + 80) {
     ball.vx *= -1;
-    ball.x = 20; // avoid stuck
+    ball.x = 20;
   }
 
-  // Right paddle
   if (ball.x + ball.size > 580 && ball.y + ball.size > opponentY && ball.y < opponentY + 80) {
     ball.vx *= -1;
-    ball.x = 568; // avoid stuck
+    ball.x = 568;
   }
 
-  // Score update
   if (ball.x < 0) {
     score.opponent++;
     resetBall();
@@ -94,7 +91,7 @@ function updateBall() {
 
   if (score.player >= winScore || score.opponent >= winScore) {
     ball.vx = ball.vy = 0;
-    ctx.fillStyle = "green";
+    ctx.fillStyle = "#00FF00";
     ctx.font = "30px monospace";
     ctx.fillText(score.player >= winScore ? "YOU WIN!" : "YOU LOSE!", 220, 200);
     return;
@@ -109,7 +106,7 @@ function updatePlayer() {
 function gameLoop() {
   if (!gameStarted) {
     ctx.clearRect(0, 0, 600, 400);
-    ctx.fillStyle = "green";
+    ctx.fillStyle = "#00FF00";
     ctx.font = "20px monospace";
     ctx.fillText("Press SPACE to start", 200, 200);
     draw();
@@ -130,7 +127,13 @@ function gameLoop() {
 }
 
 function startBall() {
-  ball = { x: 300, y: 200, vx: 4 * (Math.random() > 0.5 ? 1 : -1), vy: 2 * (Math.random() > 0.5 ? 1 : -1), size: 12 };
+  ball = {
+    x: 300,
+    y: 200,
+    vx: 4 * (Math.random() > 0.5 ? 1 : -1),
+    vy: 2 * (Math.random() > 0.5 ? 1 : -1),
+    size: 12
+  };
   gameStarted = true;
 }
 
