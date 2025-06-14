@@ -32,13 +32,11 @@ let conn = null;
 let gameStarted = false;
 let score = { player: 0, opponent: 0 };
 const winScore = 10;
+const ballSpeed = { vx: 2, vy: 1.5 }; // constant speed
 
 document.addEventListener("keydown", e => {
   if (e.key === "ArrowUp") up = true;
   if (e.key === "ArrowDown") down = true;
-  if (e.key === " " && !gameStarted) {
-    startBall();
-  }
 });
 document.addEventListener("keyup", e => {
   if (e.key === "ArrowUp") up = false;
@@ -49,16 +47,12 @@ function draw() {
   ctx.clearRect(0, 0, 600, 400);
   ctx.fillStyle = "#00FF00";
 
-  // Scores
   ctx.font = "20px monospace";
   ctx.fillText(`Player: ${score.player}`, 100, 30);
   ctx.fillText(`Opponent: ${score.opponent}`, 380, 30);
 
-  // Paddles
   ctx.fillRect(10, playerY, 10, 80);
   ctx.fillRect(580, opponentY, 10, 80);
-
-  // Ball (square)
   ctx.fillRect(ball.x, ball.y, ball.size, ball.size);
 }
 
@@ -106,42 +100,31 @@ function updatePlayer() {
 }
 
 function gameLoop() {
-  if (!gameStarted) {
-    ctx.clearRect(0, 0, 600, 400);
-    ctx.fillStyle = "#00FF00";
-    ctx.font = "20px monospace";
-    ctx.fillText("Press SPACE to start", 200, 200);
-    draw();
-    requestAnimationFrame(gameLoop);
-    return;
-  }
-
   updatePlayer();
   if (!isMultiplayer) updateAI();
   updateBall();
   draw();
 
-  if (isMultiplayer && conn?.readyState === "open") {
-    if (isHost) conn.send(JSON.stringify({ ball, playerY, score }));
+  if (isMultiplayer && conn?.readyState === "open" && isHost) {
+    conn.send(JSON.stringify({ ball, playerY, score }));
   }
 
   requestAnimationFrame(gameLoop);
 }
 
 function startBall() {
-  ball = {
-    x: 300,
-    y: 200,
-    vx: 2 * (Math.random() > 0.5 ? 1 : -1),  // slowed down
-    vy: 1 * (Math.random() > 0.5 ? 1 : -1),  // slowed down
-    size: 12
-  };
+  const directionX = Math.random() > 0.5 ? 1 : -1;
+  const directionY = Math.random() > 0.5 ? 1 : -1;
+  ball.vx = ballSpeed.vx * directionX;
+  ball.vy = ballSpeed.vy * directionY;
   gameStarted = true;
 }
 
 function resetBall() {
-  gameStarted = false;
   ball = { x: 300, y: 200, vx: 0, vy: 0, size: 12 };
+  setTimeout(() => {
+    startBall();
+  }, 1000);
 }
 
 function startSinglePlayer() {
