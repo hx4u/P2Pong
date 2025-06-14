@@ -120,13 +120,35 @@ function startBall() {
   ball.vy = 2 * directionY;
 }
 
+function startBall() {
+  const directionX = Math.random() > 0.5 ? 1 : -1;
+  const directionY = Math.random() > 0.5 ? 1 : -1;
+  ball.vx = 3 * directionX;
+  ball.vy = 2 * directionY;
+}
+
 function resetBall() {
   ball.x = 300;
   ball.y = 200;
   ball.vx = 0;
   ball.vy = 0;
-  setTimeout(startBall, 1000);
+
+  // Display "Press SPACE to Start" message
+  draw(); // Clear and redraw
+  ctx.fillStyle = "#00FF00";
+  ctx.font = "20px monospace";
+  ctx.fillText("Press SPACE to Start", 200, 200);
+
+  const waitForSpace = (e) => {
+    if (e.code === "Space") {
+      startBall();
+      window.removeEventListener("keydown", waitForSpace);
+    }
+  };
+
+  window.addEventListener("keydown", waitForSpace);
 }
+
 
 function startSinglePlayer() {
   isMultiplayer = false;
