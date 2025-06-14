@@ -36,7 +36,9 @@ const winScore = 10;
 document.addEventListener("keydown", e => {
   if (e.key === "ArrowUp") up = true;
   if (e.key === "ArrowDown") down = true;
-  if (e.key === " " && !gameStarted) startBall();
+  if (e.key === " " && !gameStarted) {
+    startBall();
+  }
 });
 document.addEventListener("keyup", e => {
   if (e.key === "ArrowUp") up = false;
@@ -62,7 +64,7 @@ function draw() {
 
 function updateAI() {
   let target = ball.y - 40;
-  opponentY += (target - opponentY) * 0.05;
+  opponentY += (target - opponentY) * 0.03;
 }
 
 function updateBall() {
@@ -130,8 +132,8 @@ function startBall() {
   ball = {
     x: 300,
     y: 200,
-    vx: 4 * (Math.random() > 0.5 ? 1 : -1),
-    vy: 2 * (Math.random() > 0.5 ? 1 : -1),
+    vx: 2 * (Math.random() > 0.5 ? 1 : -1),  // slowed down
+    vy: 1 * (Math.random() > 0.5 ? 1 : -1),  // slowed down
     size: 12
   };
   gameStarted = true;
