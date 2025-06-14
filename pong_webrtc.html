@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>WebRTC Pong</title>
+  <style>
+    canvas { background: #000; display: block; margin: auto; }
+    textarea, button { display: block; margin: 10px auto; width: 90%; }
+  </style>
+</head>
+<body>
+
+<canvas id="pong" width="600" height="400"></canvas>
+
+<button onclick="startSinglePlayer()">Single Player (vs AI)</button>
+<button onclick="startMultiplayerHost()">Host Multiplayer Game</button>
+<button onclick="startMultiplayerJoin()">Join Multiplayer Game</button>
+<textarea id="localSDP" placeholder="Your SDP will appear here..." rows="6"></textarea>
+<textarea id="remoteSDP" placeholder="Paste remote SDP here..." rows="6"></textarea>
+<button onclick="submitRemoteSDP()">Submit Remote SDP</button>
+
+<script>
+const canvas = document.getElementById("pong");
+const ctx = canvas.getContext("2d");
+
+let playerY = 150, opponentY = 150;
+let ball = { x: 300, y: 200, vx: 4, vy: 2 };
+let up = false, down = false;
+let isMultiplayer = false, isHost = false;
+let conn = null;
+
+document.addEventListener("keydown", e => {
+  if (e.key === "ArrowUp") up = true;
+  if (e.key === "ArrowDown") down = true;
+});
+document.addEventListener("keyup", e => {
+  if (e.key === "ArrowUp") up = false;
+  if (e.key === "ArrowDown") down = false;
+});
+
+function draw() {
+  ctx.clearRect(0, 0, 600, 400);
+  ctx.fillStyle = "white";
+  ctx.fillRect(10, playerY, 10, 80);
+  ctx.fillRect(580, opponentY, 10, 80);
+  ctx.beginPath();
+  ctx.arc(ball.x, ball.y, 8, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function updateAI() {
+  let target = ball.y - 40;
+  opponentY += (target - opponentY) * 0.05;
+}
+
+function updateBall() {
+  ball.x += ball.vx;
+  ball.y += ball.vy;
+
+  if (ball.y < 0 || ball.y > 400) ball.vy *= -1;
+
+  if (ball.x < 20 && ball.y > playerY && ball.y < playerY + 80) ball.vx *= -1;
+  if (ball.x > 570 && ball.y > opponentY && ball.y < opponentY + 80) ball.vx *= -1;
+
+  if (ball.x < 0 || ball.x > 600) {
+    ball.x = 300; ball.y = 200; ball.vx *= -1;
+  }
+}
+
+function updatePlayer() {
+  if (up && playerY > 0) playerY -= 5;
+  if (down && playerY < 320) playerY += 5;
+}
+
+function gameLoop() {
+  updatePlayer();
+  if (!isMultiplayer) updateAI();
+  updateBall();
+  draw();
+
+  if (isMultiplayer && conn?.readyState === "open") {
+    if (isHost) conn.send(JSON.stringify({ ball, playerY }));
+  }
+
+  requestAnimationFrame(gameLoop);
+}
+
+function startSinglePlayer() {
+  isMultiplayer = false;
+  ball = { x: 300, y: 200, vx: 4, vy: 2 };
+  requestAnimationFrame(gameLoop);
+}
+
+let pc, dataChannel;
+
+function setupConnection() {
+  pc = new RTCPeerConnection();
+  pc.onicecandidate = e => {
+    if (!e.candidate) {
+      document.getElementById("localSDP").value = JSON.stringify(pc.localDescription);
+    }
+  };
+  pc.ondatachannel = e => {
+    conn = e.channel;
+    conn.onmessage = e => {
+      const data = JSON.parse(e.data);
+      ball = data.ball;
+      opponentY = data.playerY;
+    };
+  };
+}
+
+function startMultiplayerHost() {
+  isMultiplayer = true;
+  isHost = true;
+  setupConnection();
+  dataChannel = pc.createDataChannel("pong");
+  conn = dataChannel;
+  conn.onopen = () => requestAnimationFrame(gameLoop);
+  conn.onmessage = e => {
+    const data = JSON.parse(e.data);
+    opponentY = data.playerY;
+  };
+  pc.createOffer().then(d => pc.setLocalDescription(d));
+}
+
+function startMultiplayerJoin() {
+  isMultiplayer = true;
+  isHost = false;
+  setupConnection();
+  pc.ondatachannel = e => {
+    conn = e.channel;
+    conn.onmessage = e => {
+      const data = JSON.parse(e.data);
+      ball = data.ball;
+      opponentY = data.playerY;
+    };
+    conn.onopen = () => requestAnimationFrame(gameLoop);
+  };
+}
+
+function submitRemoteSDP() {
+  const remote = document.getElementById("remoteSDP").value;
+  const parsed = JSON.parse(remote);
+  pc.setRemoteDescription(new RTCSessionDescription(parsed)).then(() => {
+    if (!isHost) {
+      pc.createAnswer().then(d => pc.setLocalDescription(d));
+    }
+  });
+}
+</script>
+
+</body>
+</html>
